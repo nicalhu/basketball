@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a73e8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>天骄杯篮球赛 - 管理后台</title>
+    <!-- 预加载关键资源 -->
+    <link rel="preload" href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" as="style">
+    <link rel="preload" href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" as="style">
+    <!-- 异步加载非关键资源 -->
+    <link rel="stylesheet" href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" media="print" onload="this.media='all'">
+    <style>
+        /* 关键CSS内联 */
+        body {
+            font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            touch-action: manipulation;
+        }
+        .nav-active {
+            background-color: #1a73e8;
+            color: white;
+        }
+        /* 移动端优化样式 */
+        @media (max-width: 768px) {
+            .container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            .grid {
+                grid-template-columns: repeat(1, 1fr);
+            }
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .table-responsive {
+                max-width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            input, select, textarea {
+                font-size: 16px !important; /* 防止iOS缩放 */
+            }
+            .mobile-full {
+                width: 100% !important;
+            }
+            .mobile-stack {
+                flex-direction: column !important;
+            }
+            .mobile-stack > * {
+                margin-bottom: 0.5rem;
+            }
+            .mobile-text-sm {
+                font-size: 0.875rem !important;
+            }
+        }
+        /* 性能优化 */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .fade-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 200ms ease-out, transform 200ms ease-out;
+        }
+        [v-cloak] {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <script>
+        // 使用会话存储加速数据访问
+        const sessionCache = {
+            set(key, value, ttl = 300000) { // 默认5分钟过期
+                const item = {
+                    value,
+                    timestamp: Date.now(),
+                    ttl
+                };
+                sessionStorage.setItem(key, JSON.stringify(item));
+            },
+            get(key) {
+                const item = sessionStorage.getItem(key);
+                if (!item) return null;
+                
+                const { value, timestamp, ttl } = JSON.parse(item);
+                if (Date.now() - timestamp > ttl) {
+                    sessionStorage.removeItem(key);
+                    return null;
+                }
+                return value;
+            }
+        };
+
+        // 性能优化：防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 优化的数据管理器
+        const dataManager = {
+            getAllTeams() {
+                const cached = sessionCache.get('teams');
+                if (cached) return cached;
+                
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                sessionCache.set('teams', data.teams);
+                return data.teams;
+            },
+            getTeamDetails(teamName) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                return data.teams[teamName];
+            },
+            updateTeam(teamData) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                data.teams[teamData.name] = teamData;
+                localStorage.setItem('basketballData', JSON.stringify(data));
+            },
+            deleteTeam(teamName) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                delete data.teams[teamName];
+                localStorage.setItem('basketballData', JSON.stringify(data));
+            },
+            getAllMatches() {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                return data.matches;
+            },
+            addMatch(matchData) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                data.matches.push(matchData);
+                localStorage.setItem('basketballData', JSON.stringify(data));
+            },
+            updateMatch(index, matchData) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                data.matches[index] = matchData;
+                localStorage.setItem('basketballData', JSON.stringify(data));
+            },
+            updateMatches(matches) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                data.matches = matches;
+                localStorage.setItem('basketballData', JSON.stringify(data));
+            },
+            getAllAds() {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                return data.ads || [];
+            },
+            addAd(adData) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                if (!data.ads) {
+                    data.ads = [];
+                }
+                data.ads.push({
+                    title: adData.title,
+                    image: adData.image,
+                    active: adData.active
+                });
+                localStorage.setItem('basketballData', JSON.stringify(data));
+                showAdManagement();
+            },
+            updateAd(index, adData) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                if (!data.ads) {
+                    data.ads = [];
+                }
+                data.ads[index] = {
+                    title: adData.title,
+                    image: adData.image || data.ads[index].image,
+                    active: adData.active
+                };
+                localStorage.setItem('basketballData', JSON.stringify(data));
+                showAdManagement();
+            },
+            deleteAd(index) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                if (data.ads && data.ads.length > index) {
+                    data.ads.splice(index, 1);
+                    localStorage.setItem('basketballData', JSON.stringify(data));
+                }
+                showAdManagement();
+            },
+            getKnockout() {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                return data.knockout || {
+                    quarterFinals: [],
+                    semiFinals: [],
+                    final: null
+                };
+            },
+            updateKnockout(knockoutData) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                data.knockout = knockoutData;
+                localStorage.setItem('basketballData', JSON.stringify(data));
+            },
+            getStandings() {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                return data.standings || [];
+            },
+            updateStandings(standingsData) {
+                const data = JSON.parse(localStorage.getItem('basketballData'));
+                data.standings = standingsData;
+                localStorage.setItem('basketballData', JSON.stringify(data));
+            },
+            initializeDefaultStandings() {
+                const teams = this.getAllTeams();
+                const defaultStandings = Object.values(teams).map(team => ({
+                    team: team.name,
+                    group: team.group,
+                    played: 0,
+                    won: 0,
+                    lost: 0,
+                    points: 0,
+                    pointsFor: 0,
+                    pointsAgainst: 0
+                }));
+                this.updateStandings(defaultStandings);
+                return defaultStandings;
+            }
+        };
+
+        // 页面加载优化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查登录状态
+            const isLoggedIn = localStorage.getItem('isLoggedIn');
+            if (isLoggedIn === 'true') {
+                document.getElementById('loginPage').classList.add('hidden');
+                document.getElementById('adminPage').classList.remove('hidden');
+                
+                // 预加载常用数据
+                dataManager.getAllTeams();
+                dataManager.getAllMatches();
+                dataManager.getStandings();
+            }
+            
+            // 添加移动端触摸事件优化
+            document.addEventListener('touchstart', function() {}, {passive: true});
+        });
+
+        // 优化表单提交处理
+        const handleFormSubmit = debounce((e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            // ... 原有的表单处理逻辑 ...
+        }, 300);
+
+        // 优化图片处理
+        function handleImageUpload(file, callback) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    // 压缩图片
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // 计算压缩后的尺寸
+                        let width = img.width;
+                        let height = img.height;
+                        const maxSize = 800;
+                        
+                        if (width > height && width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        } else if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // 转换为较小的 JPEG
+                        const compressedImage = canvas.toDataURL('image/jpeg', 0.8);
+                        resolve(compressedImage);
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 优化表格渲染
+        function renderTable(data, containerId, columns) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            // 使用文档片段优化DOM操作
+            const fragment = document.createDocumentFragment();
+            const table = document.createElement('table');
+            table.className = 'w-full table-responsive';
+            
+            // 添加表头
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headerRow.className = 'bg-gray-50';
+            
+            columns.forEach(column => {
+                const th = document.createElement('th');
+                th.className = 'px-4 py-2 mobile-text-sm';
+                th.textContent = column.label;
+                headerRow.appendChild(th);
+            });
+            
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // 添加表体
+            const tbody = document.createElement('tbody');
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                columns.forEach(column => {
+                    const td = document.createElement('td');
+                    td.className = 'border px-4 py-2 mobile-text-sm';
+                    td.innerHTML = column.render ? column.render(item) : item[column.key];
+                    row.appendChild(td);
+                });
+                tbody.appendChild(row);
+            });
+            
+            table.appendChild(tbody);
+            fragment.appendChild(table);
+            container.innerHTML = '';
+            container.appendChild(fragment);
+        }
+    </script>
+
+    <!-- 登录页面 -->
+    <div id="loginPage" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-md w-96">
+            <h2 class="text-2xl font-bold mb-6 text-center">管理员登录</h2>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">用户名</label>
+                    <input type="text" id="username" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">密码</label>
+                    <input type="password" id="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    登录
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 管理后台主页 -->
+    <div id="adminPage" class="hidden min-h-screen">
+        <nav class="bg-white shadow-md">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center h-16">
+                    <div class="text-xl font-bold">管理后台</div>
+                    <div class="flex space-x-4">
+                        <a href="index.html" class="px-3 py-2 text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-home mr-1"></i>返回前端
+                        </a>
+                        <button onclick="logout()" class="px-3 py-2 text-red-600 hover:text-red-800">
+                            <i class="fas fa-sign-out-alt mr-1"></i>退出
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mx-auto px-4 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <!-- 球队管理 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold mb-4">球队管理</h3>
+                    <button onclick="showTeamManagement()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        管理球队
+                    </button>
+                </div>
+
+                <!-- 球员管理 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold mb-4">球员管理</h3>
+                    <button onclick="showPlayerManagement()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        管理球员
+                    </button>
+                </div>
+
+                <!-- 赛程管理 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold mb-4">赛程管理</h3>
+                    <button onclick="showScheduleManagement()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        管理赛程
+                    </button>
+                </div>
+
+                <!-- 排行榜管理 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold mb-4">排行榜管理</h3>
+                    <button onclick="showStandingsManagement()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        管理排行榜
+                    </button>
+                </div>
+
+                <!-- 淘汰赛管理 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold mb-4">淘汰赛管理</h3>
+                    <button onclick="showKnockoutManagement()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        管理淘汰赛
+                    </button>
+                </div>
+
+                <!-- 广告管理 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold mb-4">广告管理</h3>
+                    <button onclick="showAdManagement()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        管理广告
+                    </button>
+                </div>
+            </div>
+
+            <!-- 管理面板 -->
+            <div id="managementPanel" class="mt-8 bg-white rounded-lg shadow-md p-6 hidden">
+                <!-- 管理面板内容将通过JavaScript动态填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 登录处理
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (username === 'admin' && password === 'admin') {
+                // 保存登录状态
+                localStorage.setItem('isLoggedIn', 'true');
+                document.getElementById('loginPage').classList.add('hidden');
+                document.getElementById('adminPage').classList.remove('hidden');
+            } else {
+                alert('用户名或密码错误！');
+            }
+        });
+
+        // 退出登录
+        function logout() {
+            // 清除登录状态
+            localStorage.removeItem('isLoggedIn');
+            document.getElementById('loginPage').classList.remove('hidden');
+            document.getElementById('adminPage').classList.add('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        // 显示球队管理面板
+        function showTeamManagement() {
+            const panel = document.getElementById('managementPanel');
+            panel.classList.remove('hidden');
+            
+            const teams = dataManager.getAllTeams();
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">球队管理</h2>
+                <div class="space-y-4">
+                    <button onclick="showAddTeamForm()" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">
+                        添加新球队
+                    </button>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-2">球队名称</th>
+                                    <th class="px-4 py-2">分组</th>
+                                    <th class="px-4 py-2">队长</th>
+                                    <th class="px-4 py-2">队员</th>
+                                    <th class="px-4 py-2">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.values(teams).map(team => `
+                                    <tr>
+                                        <td class="border px-4 py-2">${team.name}</td>
+                                        <td class="border px-4 py-2">${team.group}</td>
+                                        <td class="border px-4 py-2">${team.captain}</td>
+                                        <td class="border px-4 py-2">
+                                            A: ${team.players.A}<br>
+                                            B: ${team.players.B}<br>
+                                            C: ${team.players.C}<br>
+                                            D: ${team.players.D}
+                                        </td>
+                                        <td class="border px-4 py-2">
+                                            <button onclick="editTeam('${team.name}')" class="bg-blue-500 text-white px-2 py-1 rounded mr-2">
+                                                编辑
+                                            </button>
+                                            <button onclick="deleteTeam('${team.name}')" class="bg-red-500 text-white px-2 py-1 rounded">
+                                                删除
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 显示添加球队表单
+        function showAddTeamForm() {
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">添加新球队</h2>
+                <form id="addTeamForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">球队名称</label>
+                        <input type="text" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">分组</label>
+                        <select name="group" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            <option value="A">A组</option>
+                            <option value="B">B组</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">队长</label>
+                        <input type="text" name="captain" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">A位球员</label>
+                            <input type="text" name="playerA" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">B位球员</label>
+                            <input type="text" name="playerB" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">C位球员</label>
+                            <input type="text" name="playerC" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">D位球员</label>
+                            <input type="text" name="playerD" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showTeamManagement()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加表单提交事件处理
+            document.getElementById('addTeamForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const teamData = {
+                    name: formData.get('name'),
+                    group: formData.get('group'),
+                    captain: formData.get('captain'),
+                    players: {
+                        A: formData.get('playerA'),
+                        B: formData.get('playerB'),
+                        C: formData.get('playerC'),
+                        D: formData.get('playerD')
+                    }
+                };
+                dataManager.updateTeam(teamData);
+                showTeamManagement();
+            });
+        }
+
+        // 编辑球队
+        function editTeam(teamName) {
+            const team = dataManager.getTeamDetails(teamName);
+            if (!team) return;
+
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">编辑球队</h2>
+                <form id="editTeamForm" class="space-y-4">
+                    <input type="hidden" name="originalName" value="${team.name}">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">球队名称</label>
+                        <input type="text" name="name" value="${team.name}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">分组</label>
+                        <select name="group" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            <option value="A" ${team.group === 'A' ? 'selected' : ''}>A组</option>
+                            <option value="B" ${team.group === 'B' ? 'selected' : ''}>B组</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">队长</label>
+                        <input type="text" name="captain" value="${team.captain}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">A位球员</label>
+                            <input type="text" name="playerA" value="${team.players.A}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">B位球员</label>
+                            <input type="text" name="playerB" value="${team.players.B}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">C位球员</label>
+                            <input type="text" name="playerC" value="${team.players.C}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">D位球员</label>
+                            <input type="text" name="playerD" value="${team.players.D}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showTeamManagement()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加表单提交事件处理
+            document.getElementById('editTeamForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const originalName = formData.get('originalName');
+                const teamData = {
+                    name: formData.get('name'),
+                    group: formData.get('group'),
+                    captain: formData.get('captain'),
+                    players: {
+                        A: formData.get('playerA'),
+                        B: formData.get('playerB'),
+                        C: formData.get('playerC'),
+                        D: formData.get('playerD')
+                    }
+                };
+                
+                if (originalName !== teamData.name) {
+                    dataManager.deleteTeam(originalName);
+                }
+                dataManager.updateTeam(teamData);
+                showTeamManagement();
+            });
+        }
+
+        // 删除球队
+        function deleteTeam(teamName) {
+            if (confirm(`确定要删除球队"${teamName}"吗？`)) {
+                dataManager.deleteTeam(teamName);
+                showTeamManagement();
+            }
+        }
+
+        // 显示球员管理面板
+        function showPlayerManagement() {
+            const panel = document.getElementById('managementPanel');
+            panel.classList.remove('hidden');
+            
+            const teams = dataManager.getAllTeams();
+            const players = [];
+            
+            // 收集所有球员信息
+            Object.values(teams).forEach(team => {
+                Object.entries(team.players).forEach(([position, name]) => {
+                    players.push({
+                        name,
+                        team: team.name,
+                        position,
+                        group: team.group
+                    });
+                });
+            });
+            
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">球员管理</h2>
+                <div class="space-y-4">
+                    <div class="flex space-x-4 mb-4">
+                        <div class="flex-1">
+                            <input type="text" id="playerSearch" placeholder="输入球员姓名搜索..." 
+                                class="w-full px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div class="flex-1">
+                            <select id="teamFilter" class="w-full px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option value="">所有球队</option>
+                                ${Object.keys(teams).map(team => `
+                                    <option value="${team}">${team}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <button onclick="showAddPlayerForm()" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">
+                            添加球员
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full" id="playersTable">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-2">球员姓名</th>
+                                    <th class="px-4 py-2">所属球队</th>
+                                    <th class="px-4 py-2">位置</th>
+                                    <th class="px-4 py-2">分组</th>
+                                    <th class="px-4 py-2">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${players.map(player => `
+                                    <tr>
+                                        <td class="border px-4 py-2">${player.name}</td>
+                                        <td class="border px-4 py-2">${player.team}</td>
+                                        <td class="border px-4 py-2">${player.position}位</td>
+                                        <td class="border px-4 py-2">${player.group}组</td>
+                                        <td class="border px-4 py-2">
+                                            <button onclick="editPlayer('${player.team}', '${player.position}')" 
+                                                class="bg-blue-500 text-white px-2 py-1 rounded mr-2">
+                                                编辑
+                                            </button>
+                                            <button onclick="deletePlayer('${player.team}', '${player.position}')" 
+                                                class="bg-red-500 text-white px-2 py-1 rounded">
+                                                删除
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            // 添加搜索和筛选功能
+            const playerSearch = document.getElementById('playerSearch');
+            const teamFilter = document.getElementById('teamFilter');
+            const playersTable = document.getElementById('playersTable').getElementsByTagName('tbody')[0];
+
+            function filterPlayers() {
+                const searchText = playerSearch.value.toLowerCase();
+                const selectedTeam = teamFilter.value;
+                const rows = playersTable.getElementsByTagName('tr');
+
+                for (let row of rows) {
+                    const playerName = row.cells[0].textContent.toLowerCase();
+                    const teamName = row.cells[1].textContent;
+                    const matchesSearch = playerName.includes(searchText);
+                    const matchesTeam = !selectedTeam || teamName === selectedTeam;
+                    row.style.display = matchesSearch && matchesTeam ? '' : 'none';
+                }
+            }
+
+            playerSearch.addEventListener('input', filterPlayers);
+            teamFilter.addEventListener('change', filterPlayers);
+        }
+
+        // 显示添加球员表单
+        function showAddPlayerForm() {
+            const teams = dataManager.getAllTeams();
+            const panel = document.getElementById('managementPanel');
+            
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">添加新球员</h2>
+                <form id="addPlayerForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">球员姓名</label>
+                        <input type="text" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">所属球队</label>
+                        <select name="team" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            ${Object.keys(teams).map(team => `
+                                <option value="${team}">${team}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">位置</label>
+                        <select name="position" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            <option value="A">A位</option>
+                            <option value="B">B位</option>
+                            <option value="C">C位</option>
+                            <option value="D">D位</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showPlayerManagement()" 
+                            class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加表单提交事件处理
+            document.getElementById('addPlayerForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const teamName = formData.get('team');
+                const position = formData.get('position');
+                const playerName = formData.get('name');
+
+                const team = dataManager.getTeamDetails(teamName);
+                if (team) {
+                    team.players[position] = playerName;
+                    dataManager.updateTeam(team);
+                    showPlayerManagement();
+                }
+            });
+        }
+
+        // 编辑球员
+        function editPlayer(teamName, position) {
+            const team = dataManager.getTeamDetails(teamName);
+            if (!team) return;
+
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">编辑球员</h2>
+                <form id="editPlayerForm" class="space-y-4">
+                    <input type="hidden" name="originalTeam" value="${teamName}">
+                    <input type="hidden" name="originalPosition" value="${position}">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">球员姓名</label>
+                        <input type="text" name="name" value="${team.players[position]}" 
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">所属球队</label>
+                        <select name="team" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            ${Object.keys(dataManager.getAllTeams()).map(team => `
+                                <option value="${team}" ${team === teamName ? 'selected' : ''}>${team}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">位置</label>
+                        <select name="position" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            <option value="A" ${position === 'A' ? 'selected' : ''}>A位</option>
+                            <option value="B" ${position === 'B' ? 'selected' : ''}>B位</option>
+                            <option value="C" ${position === 'C' ? 'selected' : ''}>C位</option>
+                            <option value="D" ${position === 'D' ? 'selected' : ''}>D位</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showPlayerManagement()" 
+                            class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加表单提交事件处理
+            document.getElementById('editPlayerForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const originalTeam = formData.get('originalTeam');
+                const originalPosition = formData.get('originalPosition');
+                const newTeam = formData.get('team');
+                const newPosition = formData.get('position');
+                const playerName = formData.get('name');
+
+                // 如果是同一个球队，直接更新
+                if (originalTeam === newTeam) {
+                    const team = dataManager.getTeamDetails(newTeam);
+                    if (originalPosition !== newPosition) {
+                        delete team.players[originalPosition];
+                    }
+                    team.players[newPosition] = playerName;
+                    dataManager.updateTeam(team);
+                } else {
+                    // 如果换了球队，需要更新两个球队
+                    const oldTeam = dataManager.getTeamDetails(originalTeam);
+                    const newTeamData = dataManager.getTeamDetails(newTeam);
+                    
+                    delete oldTeam.players[originalPosition];
+                    newTeamData.players[newPosition] = playerName;
+                    
+                    dataManager.updateTeam(oldTeam);
+                    dataManager.updateTeam(newTeamData);
+                }
+                
+                showPlayerManagement();
+            });
+        }
+
+        // 删除球员
+        function deletePlayer(teamName, position) {
+            if (confirm('确定要删除这个球员吗？')) {
+                const team = dataManager.getTeamDetails(teamName);
+                if (team) {
+                    delete team.players[position];
+                    dataManager.updateTeam(team);
+                    showPlayerManagement();
+                }
+            }
+        }
+
+        // 显示赛程管理面板
+        function showScheduleManagement() {
+            const panel = document.getElementById('managementPanel');
+            panel.classList.remove('hidden');
+            
+            const matches = dataManager.getAllMatches();
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">赛程管理</h2>
+                <div class="space-y-4">
+                    <button onclick="showAddMatchForm()" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">
+                        添加新赛程
+                    </button>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-2">比赛时间</th>
+                                    <th class="px-4 py-2">对阵双方</th>
+                                    <th class="px-4 py-2">比分</th>
+                                    <th class="px-4 py-2">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${matches.map((match, index) => `
+                                    <tr>
+                                        <td class="border px-4 py-2">${match.date}</td>
+                                        <td class="border px-4 py-2">${match.team1} VS ${match.team2}</td>
+                                        <td class="border px-4 py-2">${match.score || '-'}</td>
+                                        <td class="border px-4 py-2">
+                                            <button onclick="editMatch(${index})" class="bg-blue-500 text-white px-2 py-1 rounded mr-2">
+                                                编辑
+                                            </button>
+                                            <button onclick="deleteMatch(${index})" class="bg-red-500 text-white px-2 py-1 rounded">
+                                                删除
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 显示添加赛程表单
+        function showAddMatchForm() {
+            const teams = dataManager.getAllTeams();
+            const teamOptions = Object.keys(teams).map(team => `<option value="${team}">${team}</option>`).join('');
+            
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">添加新赛程</h2>
+                <form id="addMatchForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">比赛时间</label>
+                        <input type="datetime-local" name="date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">主队</label>
+                        <select name="team1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            ${teamOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">客队</label>
+                        <select name="team2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            ${teamOptions}
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showScheduleManagement()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加表单提交事件处理
+            document.getElementById('addMatchForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const matchData = {
+                    date: formData.get('date'),
+                    team1: formData.get('team1'),
+                    team2: formData.get('team2')
+                };
+                dataManager.addMatch(matchData);
+                showScheduleManagement();
+            });
+        }
+
+        // 编辑赛程
+        function editMatch(index) {
+            const match = dataManager.getAllMatches()[index];
+            if (!match) return;
+
+            const teams = dataManager.getAllTeams();
+            const teamOptions = Object.keys(teams).map(team => `<option value="${team}" ${team === match.team1 ? 'selected' : ''}>${team}</option>`).join('');
+            
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">编辑赛程</h2>
+                <form id="editMatchForm" class="space-y-4">
+                    <input type="hidden" name="index" value="${index}">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">比赛时间</label>
+                        <input type="datetime-local" name="date" value="${match.date}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">主队</label>
+                        <select name="team1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            ${teamOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">客队</label>
+                        <select name="team2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            ${teamOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">比分</label>
+                        <input type="text" name="score" value="${match.score || ''}" placeholder="例如：80:75" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showScheduleManagement()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加表单提交事件处理
+            document.getElementById('editMatchForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const index = parseInt(formData.get('index'));
+                const matchData = {
+                    date: formData.get('date'),
+                    team1: formData.get('team1'),
+                    team2: formData.get('team2'),
+                    score: formData.get('score')
+                };
+                dataManager.updateMatch(index, matchData);
+                showScheduleManagement();
+            });
+        }
+
+        // 删除赛程
+        function deleteMatch(index) {
+            if (confirm('确定要删除这场比赛吗？')) {
+                const matches = dataManager.getAllMatches();
+                matches.splice(index, 1);
+                dataManager.updateMatches(matches);
+                showScheduleManagement();
+            }
+        }
+
+        // 显示广告管理面板
+        function showAdManagement() {
+            const panel = document.getElementById('managementPanel');
+            panel.classList.remove('hidden');
+            
+            const ads = dataManager.getAllAds();
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">广告管理</h2>
+                <div class="space-y-4">
+                    <button onclick="showAddAdForm()" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">
+                        添加新广告
+                    </button>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-2">广告标题</th>
+                                    <th class="px-4 py-2">图片预览</th>
+                                    <th class="px-4 py-2">状态</th>
+                                    <th class="px-4 py-2">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${ads.map((ad, index) => `
+                                    <tr>
+                                        <td class="border px-4 py-2">${ad.title}</td>
+                                        <td class="border px-4 py-2">
+                                            <img src="${ad.image}" alt="${ad.title}" class="h-20 object-contain">
+                                        </td>
+                                        <td class="border px-4 py-2">${ad.active ? '启用' : '禁用'}</td>
+                                        <td class="border px-4 py-2">
+                                            <button onclick="editAd(${index})" class="bg-blue-500 text-white px-2 py-1 rounded mr-2">
+                                                编辑
+                                            </button>
+                                            <button onclick="deleteAd(${index})" class="bg-red-500 text-white px-2 py-1 rounded">
+                                                删除
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 显示添加广告表单
+        function showAddAdForm() {
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">添加新广告</h2>
+                <form id="addAdForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">广告标题</label>
+                        <input type="text" name="title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">广告图片</label>
+                        <input type="file" name="image" accept="image/*" class="mt-1 block w-full" required>
+                        <div id="imagePreview" class="mt-2"></div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">状态</label>
+                        <select name="active" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            <option value="true">启用</option>
+                            <option value="false">禁用</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showAdManagement()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加图片预览功能
+            const imageInput = document.querySelector('input[name="image"]');
+            const imagePreview = document.getElementById('imagePreview');
+            imageInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        imagePreview.innerHTML = `<img src="${e.target.result}" alt="预览" class="h-40 object-contain">`;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // 添加表单提交事件处理
+            document.getElementById('addAdForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const file = formData.get('image');
+                
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const adData = {
+                            title: formData.get('title'),
+                            image: e.target.result,
+                            active: formData.get('active') === 'true'
+                        };
+                        dataManager.addAd(adData);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // 编辑广告
+        function editAd(index) {
+            const ads = dataManager.getAllAds();
+            const ad = ads[index];
+            if (!ad) return;
+
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">编辑广告</h2>
+                <form id="editAdForm" class="space-y-4">
+                    <input type="hidden" name="index" value="${index}">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">广告标题</label>
+                        <input type="text" name="title" value="${ad.title}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">广告图片</label>
+                        <input type="file" name="image" accept="image/*" class="mt-1 block w-full">
+                        <div id="imagePreview" class="mt-2">
+                            <img src="${ad.image}" alt="${ad.title}" class="h-40 object-contain">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">状态</label>
+                        <select name="active" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            <option value="true" ${ad.active ? 'selected' : ''}>启用</option>
+                            <option value="false" ${!ad.active ? 'selected' : ''}>禁用</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showAdManagement()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加图片预览功能
+            const imageInput = document.querySelector('input[name="image"]');
+            const imagePreview = document.getElementById('imagePreview');
+            imageInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        imagePreview.innerHTML = `<img src="${e.target.result}" alt="预览" class="h-40 object-contain">`;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // 添加表单提交事件处理
+            document.getElementById('editAdForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const index = parseInt(formData.get('index'));
+                const file = formData.get('image');
+                
+                if (file.size > 0) {
+                    // 如果选择了新图片
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const adData = {
+                            title: formData.get('title'),
+                            image: e.target.result,
+                            active: formData.get('active') === 'true'
+                        };
+                        dataManager.updateAd(index, adData);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    // 如果没有选择新图片
+                    const adData = {
+                        title: formData.get('title'),
+                        active: formData.get('active') === 'true'
+                    };
+                    dataManager.updateAd(index, adData);
+                }
+            });
+        }
+
+        // 删除广告
+        function deleteAd(index) {
+            if (confirm('确定要删除这个广告吗？')) {
+                dataManager.deleteAd(index);
+            }
+        }
+
+        // 显示排行榜管理面板
+        function showStandingsManagement() {
+            const panel = document.getElementById('managementPanel');
+            panel.classList.remove('hidden');
+            
+            const standings = dataManager.getStandings();
+            if (standings.length === 0) {
+                // 如果没有排行榜数据，初始化默认数据
+                dataManager.initializeDefaultStandings();
+            }
+            
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">排行榜管理</h2>
+                <div class="space-y-4">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-2">球队</th>
+                                    <th class="px-4 py-2">分组</th>
+                                    <th class="px-4 py-2">比赛场数</th>
+                                    <th class="px-4 py-2">胜场</th>
+                                    <th class="px-4 py-2">负场</th>
+                                    <th class="px-4 py-2">得分</th>
+                                    <th class="px-4 py-2">失分</th>
+                                    <th class="px-4 py-2">积分</th>
+                                    <th class="px-4 py-2">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${standings.map((team, index) => `
+                                    <tr>
+                                        <td class="border px-4 py-2">${team.team}</td>
+                                        <td class="border px-4 py-2">${team.group}</td>
+                                        <td class="border px-4 py-2">${team.played}</td>
+                                        <td class="border px-4 py-2">${team.won}</td>
+                                        <td class="border px-4 py-2">${team.lost}</td>
+                                        <td class="border px-4 py-2">${team.pointsFor}</td>
+                                        <td class="border px-4 py-2">${team.pointsAgainst}</td>
+                                        <td class="border px-4 py-2">${team.points}</td>
+                                        <td class="border px-4 py-2">
+                                            <button onclick="editStanding(${index})" class="bg-blue-500 text-white px-2 py-1 rounded mr-2">
+                                                编辑
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 编辑排行榜记录
+        function editStanding(index) {
+            const standings = dataManager.getStandings();
+            const standing = standings[index];
+            if (!standing) return;
+
+            const panel = document.getElementById('managementPanel');
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">编辑排行榜记录</h2>
+                <form id="editStandingForm" class="space-y-4">
+                    <input type="hidden" name="index" value="${index}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">球队名称</label>
+                            <input type="text" name="team" value="${standing.team}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">分组</label>
+                            <input type="text" name="group" value="${standing.group}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">比赛场数</label>
+                            <input type="number" name="played" value="${standing.played}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">胜场</label>
+                            <input type="number" name="won" value="${standing.won}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">负场</label>
+                            <input type="number" name="lost" value="${standing.lost}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">得分</label>
+                            <input type="number" name="pointsFor" value="${standing.pointsFor}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">失分</label>
+                            <input type="number" name="pointsAgainst" value="${standing.pointsAgainst}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">积分</label>
+                            <input type="number" name="points" value="${standing.points}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="showStandingsManagement()" class="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600">
+                            取消
+                        </button>
+                        <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            // 添加表单提交事件处理
+            document.getElementById('editStandingForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const index = parseInt(formData.get('index'));
+                const standingData = {
+                    team: formData.get('team'),
+                    group: formData.get('group'),
+                    played: parseInt(formData.get('played')),
+                    won: parseInt(formData.get('won')),
+                    lost: parseInt(formData.get('lost')),
+                    pointsFor: parseInt(formData.get('pointsFor')),
+                    pointsAgainst: parseInt(formData.get('pointsAgainst')),
+                    points: parseInt(formData.get('points'))
+                };
+                
+                const standings = dataManager.getStandings();
+                standings[index] = standingData;
+                dataManager.updateStandings(standings);
+                showStandingsManagement();
+            });
+        }
+
+        // 显示淘汰赛管理面板
+        function showKnockoutManagement() {
+            const panel = document.getElementById('managementPanel');
+            panel.classList.remove('hidden');
+            
+            const knockout = dataManager.getKnockout();
+            const teams = dataManager.getAllTeams();
+            const teamOptions = Object.keys(teams).map(team => `<option value="${team}">${team}</option>`).join('');
+            
+            panel.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">淘汰赛管理</h2>
+                <div class="space-y-8">
+                    <!-- 八强赛 -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">八强赛</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${Array(4).fill(0).map((_, i) => `
+                                <div class="border p-4 rounded-lg">
+                                    <h4 class="font-medium mb-2">第${i + 1}场</h4>
+                                    <div class="space-y-2">
+                                        <select class="w-full p-2 border rounded" onchange="updateQuarterFinal(${i}, 'team1', this.value)">
+                                            <option value="">选择球队1</option>
+                                            ${teamOptions}
+                                        </select>
+                                        <select class="w-full p-2 border rounded" onchange="updateQuarterFinal(${i}, 'team2', this.value)">
+                                            <option value="">选择球队2</option>
+                                            ${teamOptions}
+                                        </select>
+                                        <input type="text" placeholder="比分" class="w-full p-2 border rounded" 
+                                            value="${knockout.quarterFinals[i]?.score || ''}"
+                                            onchange="updateQuarterFinal(${i}, 'score', this.value)">
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- 半决赛 -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">半决赛</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${Array(2).fill(0).map((_, i) => `
+                                <div class="border p-4 rounded-lg">
+                                    <h4 class="font-medium mb-2">第${i + 1}场</h4>
+                                    <div class="space-y-2">
+                                        <select class="w-full p-2 border rounded" onchange="updateSemiFinal(${i}, 'team1', this.value)">
+                                            <option value="">选择球队1</option>
+                                            ${teamOptions}
+                                        </select>
+                                        <select class="w-full p-2 border rounded" onchange="updateSemiFinal(${i}, 'team2', this.value)">
+                                            <option value="">选择球队2</option>
+                                            ${teamOptions}
+                                        </select>
+                                        <input type="text" placeholder="比分" class="w-full p-2 border rounded" 
+                                            value="${knockout.semiFinals[i]?.score || ''}"
+                                            onchange="updateSemiFinal(${i}, 'score', this.value)">
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- 决赛 -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">决赛</h3>
+                        <div class="border p-4 rounded-lg">
+                            <div class="space-y-2">
+                                <select class="w-full p-2 border rounded" onchange="updateFinal('team1', this.value)">
+                                    <option value="">选择球队1</option>
+                                    ${teamOptions}
+                                </select>
+                                <select class="w-full p-2 border rounded" onchange="updateFinal('team2', this.value)">
+                                    <option value="">选择球队2</option>
+                                    ${teamOptions}
+                                </select>
+                                <input type="text" placeholder="比分" class="w-full p-2 border rounded" 
+                                    value="${knockout.final?.score || ''}"
+                                    onchange="updateFinal('score', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 设置已选择的球队
+            knockout.quarterFinals.forEach((match, i) => {
+                if (match) {
+                    const selects = panel.querySelectorAll(`div:nth-child(${i + 1}) select`);
+                    if (selects[0]) selects[0].value = match.team1 || '';
+                    if (selects[1]) selects[1].value = match.team2 || '';
+                }
+            });
+
+            knockout.semiFinals.forEach((match, i) => {
+                if (match) {
+                    const selects = panel.querySelectorAll(`div:nth-child(${i + 1}) select`);
+                    if (selects[0]) selects[0].value = match.team1 || '';
+                    if (selects[1]) selects[1].value = match.team2 || '';
+                }
+            });
+
+            if (knockout.final) {
+                const selects = panel.querySelectorAll(`div:last-child select`);
+                if (selects[0]) selects[0].value = knockout.final.team1 || '';
+                if (selects[1]) selects[1].value = knockout.final.team2 || '';
+            }
+        }
+
+        // 更新八强赛数据
+        function updateQuarterFinal(index, field, value) {
+            const knockout = dataManager.getKnockout();
+            if (!knockout.quarterFinals[index]) {
+                knockout.quarterFinals[index] = {};
+            }
+            knockout.quarterFinals[index][field] = value;
+            dataManager.updateKnockout(knockout);
+        }
+
+        // 更新半决赛数据
+        function updateSemiFinal(index, field, value) {
+            const knockout = dataManager.getKnockout();
+            if (!knockout.semiFinals[index]) {
+                knockout.semiFinals[index] = {};
+            }
+            knockout.semiFinals[index][field] = value;
+            dataManager.updateKnockout(knockout);
+        }
+
+        // 更新决赛数据
+        function updateFinal(field, value) {
+            const knockout = dataManager.getKnockout();
+            if (!knockout.final) {
+                knockout.final = {};
+            }
+            knockout.final[field] = value;
+            dataManager.updateKnockout(knockout);
+        }
+    </script>
+</body>
+</html> 
