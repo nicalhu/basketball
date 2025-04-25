@@ -1,0 +1,19 @@
+name: basketball
+title: 天骄杯篮球赛
+description: 2025年第四届"天骄杯"篮球友谊赛
+baseurl: "/basketball"
+url: "https://nicalhu.github.io"
+
+# Build settings
+markdown: kramdown
+theme: jekyll-theme-cayman
+
+# Default layout
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# Specify the index page
+index_page: index.html 
